@@ -1,0 +1,44 @@
+name: Terraform Plan
+
+on:
+  push:
+    branches:
+      - "feature/**"
+
+  workflow_dispatch: parent_module
+
+jobs:
+  terraform:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./parent_module
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login Using Service Principal
+        run: |
+          az login \
+            --service-principal \
+            --username "d9bc2374-158d-4c21-8c6a-ce6fa1b4a924" \
+            --password "YOUR_SECRET" \
+            --tenant "91695fd6-371b-4c10-8dc9-21e31d347ad6"
+
+          az account set \
+            --subscription "b299f192-d573-4040-b542-2aff90a974b5"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan
