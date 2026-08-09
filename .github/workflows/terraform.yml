@@ -61,7 +61,7 @@ jobs:
         uses: actions/checkout@v4
 
 # =========================================================
-      # STEP 3 - Azure Login
+      # STEP 3 - Azure Login 2
       # =========================================================
       - name: Azure Login
         uses: azure/login@v2
