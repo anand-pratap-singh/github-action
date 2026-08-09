@@ -1,1 +1,3 @@
-variable "rg_name" {}
+variable "rg_name" {
+    type = "string"
+}
