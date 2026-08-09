@@ -1,4 +1,4 @@
-name: Terraform Plan
+name: Terraform CI Pipeline
 
 on:
   push:
@@ -6,28 +6,30 @@ on:
       - "feature/**"
 
 jobs:
+
   terraform:
     name: Terraform Plan
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: ./Parent_moduel
+        working-directory: ./parent_module
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login Using Service Principal
-        run: |
-          az login \
-            --service-principal \
-            --username "d9bc2374-158d-4c21-8c6a-ce6fa1b4a924" \
-            --password "xVF8Q~z.lN6HVQgnOhX1UFSu7LG6u7mSEviWFaM3" \
-            --tenant "91695fd6-371b-4c10-8dc9-21e31d347ad6"
-
-          az account set \
-            --subscription "b299f192-d573-4040-b542-2aff90a974b5"
+      # 🔐 Azure Login (FIXED ✅)
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -39,4 +41,97 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Upload tfplan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ./parent_module/tfplan
+
+
+  security-scan:
+    name: Security & Cost Scan
+    runs-on: ubuntu-latest
+    needs: terraform
+
+    defaults:
+      run:
+        working-directory: ./parent_module
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+# =========================================================
+      # STEP 3 - Azure Login 2
+      # =========================================================
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # 🐍 Python (for Checkov)
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      # 🔍 Checkov
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Checkov
+        run: checkov -d . --quiet
+
+      # 🔍 TFLint
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Init TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint
+
+      # 🔍 tfsec
+      - name: Install tfsec
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
+      - name: Run tfsec
+        run: tfsec .
+
+      # 🔍 TruffleHog
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh
+
+      - name: Run TruffleHog
+        run: trufflehog filesystem . --no-update
+
+      # 💰 Infracost
+      # ==========================
+      # Infracost
+      # ==========================
+
+      - name: Install Infracost
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+
+      - name: Check Infracost Version
+        run: infracost --version
+
+      - name: Run Infracost
+        run: |
+          infracost breakdown \
+            --path . \
+            --format table
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
