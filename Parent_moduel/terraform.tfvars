@@ -25,12 +25,16 @@ subnets = {
     resource_group_name  = "rg-prod-01"
     virtual_network_name = "vnet-prod-01"
     address_prefixes     = ["10.143.1.0/24"]
+    nsg_name = "nsg1"
+    location            = "eastus"
   }
   subnet2 = {
     name                 = "subnet-prod-02"
     resource_group_name  = "rg-prod-01"
     virtual_network_name = "vnet-prod-01"
     address_prefixes     = ["10.143.2.0/24"]
+    nsg_name = "nsg2"
+    location            = "eastus"
   }
 
 }
